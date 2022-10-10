@@ -17,9 +17,10 @@
 package doodle.plot
 
 import cats._
-import cats.data.{NonEmptyList, NonEmptyVector}
-import doodle.core.Point
+import cats.data.NonEmptyList
+import cats.data.NonEmptyVector
 import cats.syntax.all._
+import doodle.core.Point
 
 sealed abstract class Plot extends Product with Serializable {
   import Plot._

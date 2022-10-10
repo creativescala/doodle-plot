@@ -16,10 +16,10 @@
 
 package doodle.plot
 
-import doodle.core.Point
 import cats.Reducible
-import cats.syntax.all._
 import cats.kernel.Semigroup
+import cats.syntax.all._
+import doodle.core.Point
 
 final case class BoundingBox(
     left: Double,
