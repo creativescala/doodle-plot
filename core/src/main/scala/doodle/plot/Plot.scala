@@ -17,7 +17,7 @@
 package doodle.plot
 
 import cats._
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, NonEmptyVector}
 import doodle.core.Point
 import cats.syntax.all._
 
@@ -33,15 +33,38 @@ sealed abstract class Plot extends Product with Serializable {
     }
 }
 object Plot {
-  final case class ScatterPlot[C[_]](data: C[Point], reducible: Reducible[C])
-      extends Plot {
-    val boundingBox: BoundingBox = BoundingBox.fromPoints(data)(reducible)
+  final case class ScatterPlot[C[_]: Reducible](data: C[Point]) extends Plot {
+    val boundingBox: BoundingBox = BoundingBox.fromPoints(data)
   }
-  final case class Interpolation[C[_]](data: C[Point], reducible: Reducible[C])
-      extends Plot {
-    val boundingBox: BoundingBox = BoundingBox.fromPoints(data)(reducible)
+  final case class Interpolation[C[_]: Reducible](data: C[Point]) extends Plot {
+    val boundingBox: BoundingBox = BoundingBox.fromPoints(data)
   }
   final case class And(plots: NonEmptyList[Plot]) extends Plot {
     val boundingBox = plots.reduceMap(plot => plot.boundingBox)
+  }
+
+  /** Create a scatterplot from data. */
+  def scatterPlot[C[_]: Reducible](data: C[Point]): ScatterPlot[C] =
+    ScatterPlot(data)
+
+  /** Create a plot that interplates a curve between data points. */
+  def interpolation[C[_]: Reducible](data: C[Point]): Interpolation[C] =
+    Interpolation(data)
+
+  /** Create a plot that interpolates a curve from data points sampled from the
+    * given function in the range from start to end.
+    */
+  def function(start: Double, stop: Double)(
+      f: Double => Double
+  ): Interpolation[NonEmptyVector] = {
+    val x0 = start.min(stop)
+    val x1 = start.max(stop)
+    val range = x1 - x0
+
+    val data =
+      for (x <- 0.to(100).map(x => (x.toDouble / 100.0) * range + x0))
+        yield Point(x, f(x))
+
+    interpolation(NonEmptyVector.fromVectorUnsafe(data.toVector))
   }
 }
