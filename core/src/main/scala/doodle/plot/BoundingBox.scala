@@ -26,7 +26,24 @@ final case class BoundingBox(
     top: Double,
     right: Double,
     bottom: Double
-)
+) {
+
+  /** Create a transformation that maps points within this bounding box to a
+    * rectangle centered on the origin with given width and height. The
+    * transform is created so that the top left of the bounding box maps to the
+    * top left of the rectangle, and so on.
+    */
+  def transformation(width: Int, height: Int): Point => Point = {
+    val xScale = width.toDouble / (right - left)
+    val yScale = height.toDouble / (top - bottom)
+
+    point => {
+      val x = (point.x - left) * xScale + (-width.toDouble) / 2.0
+      val y = (point.y - bottom) * yScale + (-height.toDouble) / 2.0
+      Point(x, y)
+    }
+  }
+}
 object BoundingBox {
   implicit val boundingBoxSemigroup: Semigroup[BoundingBox] =
     new Semigroup[BoundingBox] {

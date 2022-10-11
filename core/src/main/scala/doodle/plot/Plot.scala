@@ -21,6 +21,9 @@ import cats.data.NonEmptyList
 import cats.data.NonEmptyVector
 import cats.syntax.all._
 import doodle.core.Point
+import doodle.language.Basic
+import doodle.algebra.Picture
+import doodle.syntax.all._
 
 sealed abstract class Plot extends Product with Serializable {
   import Plot._
@@ -32,16 +35,50 @@ sealed abstract class Plot extends Product with Serializable {
       case And(plots) => And(that :: plots)
       case other      => And(NonEmptyList.of(that, other))
     }
+
+  def draw[Alg[x[_]] <: Basic[x], F[_]](
+      x: Int,
+      y: Int
+  ): Picture[Alg, F, Unit] = {
+    val tx = boundingBox.transformation(x, y)
+    render(tx)
+  }
+
+  protected def render[Alg[x[_]] <: Basic[x], F[_]](
+      tx: Point => Point
+  ): Picture[Alg, F, Unit]
 }
 object Plot {
   final case class ScatterPlot[C[_]: Reducible](data: C[Point]) extends Plot {
     val boundingBox: BoundingBox = BoundingBox.fromPoints(data)
+
+    protected def render[Alg[x[_]] <: Basic[x], F[_]](
+        tx: Point => Point
+    ): Picture[Alg, F, Unit] =
+      data.foldLeft(empty[Alg, F])((accum, pt) =>
+        circle[Alg, F](5).at(tx(pt)).on(accum)
+      )
   }
-  final case class Interpolation[C[_]: Reducible](data: C[Point]) extends Plot {
+
+  final case class Interpolation[C[_]: Reducible: Functor](data: C[Point])
+      extends Plot {
     val boundingBox: BoundingBox = BoundingBox.fromPoints(data)
+
+    protected def render[Alg[x[_]] <: Basic[x], F[_]](
+        tx: Point => Point
+    ): Picture[Alg, F, Unit] =
+      interpolatingSpline[Alg, F](data.map(pt => tx(pt)).toList)
   }
+
   final case class And(plots: NonEmptyList[Plot]) extends Plot {
     val boundingBox = plots.reduceMap(plot => plot.boundingBox)
+
+    protected def render[Alg[x[_]] <: Basic[x], F[_]](
+        tx: Point => Point
+    ): Picture[Alg, F, Unit] =
+      plots.map(plot => plot.render[Alg, F](tx)).foldLeft(empty[Alg, F]) {
+        (accum, pic) => pic.on(accum)
+      }
   }
 
   /** Create a scatterplot from data. */
@@ -49,7 +86,9 @@ object Plot {
     ScatterPlot(data)
 
   /** Create a plot that interplates a curve between data points. */
-  def interpolation[C[_]: Reducible](data: C[Point]): Interpolation[C] =
+  def interpolation[C[_]: Reducible: Functor](
+      data: C[Point]
+  ): Interpolation[C] =
     Interpolation(data)
 
   /** Create a plot that interpolates a curve from data points sampled from the
